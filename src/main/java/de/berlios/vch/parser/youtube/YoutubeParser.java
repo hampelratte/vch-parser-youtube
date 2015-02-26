@@ -83,7 +83,7 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
         OverviewPage subscriptions = new OverviewPage();
         subscriptions.setParser(getId());
-        subscriptions.setTitle("Subscriptions");
+        subscriptions.setTitle(resourceBundle.getString("I18N_SUBSCRIPTIONS"));
         subscriptions.setUri(new URI("yt://subscriptions"));
         root.getPages().add(subscriptions);
 
@@ -193,14 +193,14 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
         IOverviewPage uploadsPage = new OverviewPage();
         uploadsPage.setParser(getId());
-        uploadsPage.setTitle("Videos");
+        uploadsPage.setTitle(resourceBundle.getString("I18N_VIDEOS"));
         uploadsPage.setUri(new URI("yt://playlist/" + relatedPlaylists.getString("uploads")));
         opage.getPages().add(uploadsPage);
 
         // add playlists
         IOverviewPage playlists = new OverviewPage();
         playlists.setParser(getId());
-        playlists.setTitle("Playlists");
+        playlists.setTitle(resourceBundle.getString("I18N_PLAYLISTS"));
         playlists.setUri(new URI("yt://playlists/" + channelId));
         parseChannelPlaylists(playlists);
         opage.getPages().add(playlists);
@@ -208,7 +208,7 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
         if (relatedPlaylists.has("favorites")) {
             IOverviewPage favoritesPage = new OverviewPage();
             favoritesPage.setParser(getId());
-            favoritesPage.setTitle("Favorites");
+            favoritesPage.setTitle(resourceBundle.getString("I18N_FAVORITES"));
             favoritesPage.setUri(new URI("yt://playlist/" + relatedPlaylists.getString("favorites")));
             opage.getPages().add(favoritesPage);
         }
@@ -216,7 +216,7 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
         if (relatedPlaylists.has("likes")) {
             IOverviewPage likedPage = new OverviewPage();
             likedPage.setParser(getId());
-            likedPage.setTitle("Likes");
+            likedPage.setTitle(resourceBundle.getString("I18N_LIKES"));
             likedPage.setUri(new URI("yt://playlist/" + relatedPlaylists.getString("likes")));
             opage.getPages().add(likedPage);
         }
