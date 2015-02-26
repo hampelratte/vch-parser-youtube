@@ -3,18 +3,11 @@ package de.berlios.vch.parser.youtube;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.SortedSet;
-import java.util.StringTokenizer;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
@@ -54,14 +47,14 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
     @Requires
     private ConfigService cs;
-    private Preferences prefs;
+    Preferences prefs;
 
     @Requires
-    private LogService logger;
+    LogService logger;
 
     private BundleContext ctx;
 
-    private ResourceBundle resourceBundle;
+    ResourceBundle resourceBundle;
 
     private ServiceRegistration<IWebMenuEntry> menuReg;
 
@@ -76,18 +69,7 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
     @Override
     public IOverviewPage getRoot() throws Exception {
-        OverviewPage root = new OverviewPage();
-        root.setParser(getId());
-        root.setTitle("Youtube");
-        root.setUri(new URI("vchpage://localhost/" + getId()));
-
-        OverviewPage subscriptions = new OverviewPage();
-        subscriptions.setParser(getId());
-        subscriptions.setTitle(resourceBundle.getString("I18N_SUBSCRIPTIONS"));
-        subscriptions.setUri(new URI("yt://subscriptions"));
-        root.getPages().add(subscriptions);
-
-        return root;
+        return new RootPageParser(this).parseRoot();
     }
 
     @Override
@@ -103,123 +85,14 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
         if ("yt://subscriptions".equals(uri)) {
             parseSubscriptions(page);
         } else if (uri.startsWith("yt://channel/")) {
-            parseChannel(page);
+            IOverviewPage opage = (IOverviewPage) page;
+            page = new ChannelParser(this).parse(opage);
         } else if (uri.startsWith("yt://playlist/")) {
-            parsePlaylist(page);
+            new PlaylistParser(this, logger, prefs).parsePlaylist(page);
         } else if (uri.startsWith("yt://playlists/")) {
-            parseChannelPlaylists(page);
+            new ChannelParser(this).parseChannelPlaylists(page);
         }
         return page;
-    }
-
-    private void parseChannelPlaylists(IWebPage page) throws Exception {
-        IOverviewPage opage = (IOverviewPage) page;
-        String channelId = opage.getUri().getPath().substring(1);
-        String uri = "https://www.googleapis.com/youtube/v3/playlists?part=snippet&maxResults=30&channelId=" + channelId;
-        String json = HttpUtils.get(uri, createHeaders(), CHARSET);
-        JSONObject response = new JSONObject(json);
-        JSONArray items = response.getJSONArray("items");
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject playlist = items.getJSONObject(i);
-            JSONObject snippet = playlist.getJSONObject("snippet");
-            IOverviewPage playlistPage = new OverviewPage();
-            playlistPage.setParser(getId());
-            playlistPage.setTitle(snippet.getString("title"));
-            playlistPage.setUri(new URI("yt://playlist/" + playlist.getString("id")));
-            opage.getPages().add(playlistPage);
-        }
-    }
-
-    private void parsePlaylist(IWebPage page) throws Exception {
-        IOverviewPage opage = (IOverviewPage) page;
-        String playlistId = opage.getUri().getPath().substring(1);
-        String uri = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=30&playlistId=" + playlistId;
-        String json = HttpUtils.get(uri, createHeaders(), CHARSET);
-        JSONObject response = new JSONObject(json);
-        JSONArray items = response.getJSONArray("items");
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject item = items.getJSONObject(i);
-            JSONObject snippet = item.getJSONObject("snippet");
-            YoutubeVideoPageProxy video = new YoutubeVideoPageProxy(logger, prefs);
-            video.setParser(getId());
-            video.setTitle(snippet.getString("title"));
-            video.setDescription(snippet.getString("description"));
-            video.setPublishDate(parsePublishDate(snippet));
-            video.setThumbnail(parseThumbnail(snippet));
-            String videoId = snippet.getJSONObject("resourceId").getString("videoId");
-            video.setUri(new URI("https://www.youtube.com/watch?v=" + videoId));
-            video.setVideoUri(new URI("yt://video/" + videoId));
-            opage.getPages().add(video);
-        }
-    }
-
-    private Calendar parsePublishDate(JSONObject snippet) {
-        if (snippet.has("publishedAt")) {
-            try {
-                String dateString = snippet.getString("publishedAt");
-                Date publishedAt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'.000Z'").parse(dateString);
-                Calendar pubDate = Calendar.getInstance();
-                pubDate.setTime(publishedAt);
-                return pubDate;
-            } catch (Exception e) {
-                logger.log(LogService.LOG_WARNING, "Couldn't parse publish date", e);
-            }
-        }
-        return null;
-    }
-
-    private URI parseThumbnail(JSONObject snippet) {
-        if (snippet.has("thumbnails")) {
-            try {
-                JSONObject thumbs = snippet.getJSONObject("thumbnails");
-                String size = thumbs.has("medium") ? "medium" : "default";
-                JSONObject thumb = thumbs.getJSONObject(size);
-                return new URI(thumb.getString("url"));
-            } catch (Exception e) {
-                logger.log(LogService.LOG_WARNING, "Couldn't parse thumbnail", e);
-            }
-        }
-        return null;
-    }
-
-    private void parseChannel(IWebPage page) throws Exception {
-        IOverviewPage opage = (IOverviewPage) page;
-        String channelId = opage.getUri().getPath().substring(1);
-        String uri = "https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=" + channelId;
-        String json = HttpUtils.get(uri, createHeaders(), CHARSET);
-        JSONObject response = new JSONObject(json);
-        JSONObject item = response.getJSONArray("items").getJSONObject(0);
-        JSONObject relatedPlaylists = item.getJSONObject("contentDetails").getJSONObject("relatedPlaylists");
-
-        IOverviewPage uploadsPage = new OverviewPage();
-        uploadsPage.setParser(getId());
-        uploadsPage.setTitle(resourceBundle.getString("I18N_VIDEOS"));
-        uploadsPage.setUri(new URI("yt://playlist/" + relatedPlaylists.getString("uploads")));
-        opage.getPages().add(uploadsPage);
-
-        // add playlists
-        IOverviewPage playlists = new OverviewPage();
-        playlists.setParser(getId());
-        playlists.setTitle(resourceBundle.getString("I18N_PLAYLISTS"));
-        playlists.setUri(new URI("yt://playlists/" + channelId));
-        parseChannelPlaylists(playlists);
-        opage.getPages().add(playlists);
-
-        if (relatedPlaylists.has("favorites")) {
-            IOverviewPage favoritesPage = new OverviewPage();
-            favoritesPage.setParser(getId());
-            favoritesPage.setTitle(resourceBundle.getString("I18N_FAVORITES"));
-            favoritesPage.setUri(new URI("yt://playlist/" + relatedPlaylists.getString("favorites")));
-            opage.getPages().add(favoritesPage);
-        }
-
-        if (relatedPlaylists.has("likes")) {
-            IOverviewPage likedPage = new OverviewPage();
-            likedPage.setParser(getId());
-            likedPage.setTitle(resourceBundle.getString("I18N_LIKES"));
-            likedPage.setUri(new URI("yt://playlist/" + relatedPlaylists.getString("likes")));
-            opage.getPages().add(likedPage);
-        }
     }
 
     private void parseSubscriptions(IWebPage page) throws Exception {
@@ -239,14 +112,14 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
         }
     }
 
-    private Map<String, String> createHeaders() {
+    Map<String, String> createHeaders() {
         String accessToken = prefs.get("oauth.token.access", "");
         Map<String, String> headers = new HashMap<String, String>();
         headers.put("Authorization", "Bearer " + accessToken);
         return headers;
     }
 
-    private void checkAndRefreshToken() throws UnsupportedEncodingException, IOException, JSONException {
+    void checkAndRefreshToken() throws UnsupportedEncodingException, IOException, JSONException {
         if (tokenNeedsRefresh()) {
             logger.log(LogService.LOG_DEBUG, "Access token needs a refresh");
             refreshToken();
@@ -341,46 +214,4 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
         }
         return resourceBundle;
     }
-
-    public Map<String, Object> parseQuery(String query) throws UnsupportedEncodingException {
-        Map<String, Object> parameters = new HashMap<String, Object>();
-        if (query != null) {
-            StringTokenizer st = new StringTokenizer(query, "&");
-            while (st.hasMoreTokens()) {
-                String keyValue = st.nextToken();
-                StringTokenizer st2 = new StringTokenizer(keyValue, "=");
-                String key = null;
-                String value = "";
-                if (st2.hasMoreTokens()) {
-                    key = st2.nextToken();
-                    key = URLDecoder.decode(key, "UTF-8");
-                }
-
-                if (st2.hasMoreTokens()) {
-                    value = st2.nextToken();
-                    value = URLDecoder.decode(value, "UTF-8");
-                }
-
-                logger.log(LogService.LOG_DEBUG, "Found key value pair: " + key + "," + value);
-                if (parameters.containsKey(key)) {
-                    logger.log(LogService.LOG_DEBUG, "Key already exists. Assuming array of values. Will bes tored in a list");
-                    Object o = parameters.get(key);
-                    if (o instanceof List) {
-                        @SuppressWarnings("unchecked")
-                        List<String> values = (List<String>) o;
-                        values.add(value);
-                    } else if (o instanceof String) {
-                        List<String> values = new ArrayList<String>();
-                        values.add((String) o);
-                        values.add(value);
-                        parameters.put(key, values);
-                    }
-                } else {
-                    parameters.put(key, value);
-                }
-            }
-        }
-        return parameters;
-    }
-
 }
