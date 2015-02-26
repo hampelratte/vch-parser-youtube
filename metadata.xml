@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iPOJO>
+	<instance component="de.berlios.vch.parser.youtube.YoutubeParser" name="vch.parser.youtube" />
+	<instance component="de.berlios.vch.parser.youtube.ConfigServlet" name="vch.parser.youtube.web.servlet.config" />
+	<instance component="de.berlios.vch.parser.youtube.OauthServlet" name="vch.parser.youtube.web.servlet.oauth" />
+</iPOJO>
