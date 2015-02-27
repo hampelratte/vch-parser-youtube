@@ -32,6 +32,7 @@ public class RootPageParser {
         root.setUri(new URI("vchpage://localhost/" + youtubeParser.getId()));
 
         addSubscriptions();
+        addPlaylists();
 
         relatedPlaylists = getRelatedPlaylists();
         addRelatedPlaylist("favorites", "I18N_FAVORITES");
@@ -67,5 +68,19 @@ public class RootPageParser {
         subscriptions.setTitle(youtubeParser.resourceBundle.getString("I18N_SUBSCRIPTIONS"));
         subscriptions.setUri(new URI("yt://subscriptions"));
         root.getPages().add(subscriptions);
+    }
+
+    private void addPlaylists() throws Exception {
+        youtubeParser.checkAndRefreshToken();
+        String content = HttpUtils.get("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", youtubeParser.createHeaders(), CHARSET);
+        JSONObject response = new JSONObject(content);
+        JSONObject item = response.getJSONArray("items").getJSONObject(0);
+        String channelId = item.getString("id");
+
+        OverviewPage playlists = new OverviewPage();
+        playlists.setParser(youtubeParser.getId());
+        playlists.setTitle(youtubeParser.resourceBundle.getString("I18N_PLAYLISTS"));
+        playlists.setUri(new URI("yt://playlists/" + channelId));
+        root.getPages().add(playlists);
     }
 }
