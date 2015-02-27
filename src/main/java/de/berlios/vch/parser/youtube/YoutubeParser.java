@@ -91,6 +91,10 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
             new PlaylistParser(this, logger, prefs).parsePlaylist(page);
         } else if (uri.startsWith("yt://playlists/")) {
             new ChannelParser(this).parseChannelPlaylists(page);
+        } else if (uri.startsWith("https://www.youtube.com/watch?v=")) {
+            page = new SingleVideoParser(this, logger, prefs).parseVideo(page);
+        } else if (uri.contains("/search?")) {
+            new SearchParser(this, logger, prefs).parseSearch(page);
         }
         return page;
     }
