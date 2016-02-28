@@ -60,6 +60,7 @@ public abstract class AbstractVideoListParser {
     }
 
     protected void parseVideoList(IOverviewPage opage, String uri) throws IOException, JSONException, URISyntaxException, Exception {
+        opage.getPages().clear();
         String json = HttpUtils.get(uri, youtubeParser.createHeaders(), CHARSET);
         JSONObject response = new JSONObject(json);
         JSONArray items = response.getJSONArray("items");

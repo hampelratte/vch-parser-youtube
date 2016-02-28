@@ -65,6 +65,7 @@ public class ChannelParser {
 
     void parseChannelPlaylists(IWebPage page) throws Exception {
         IOverviewPage opage = (IOverviewPage) page;
+        opage.getPages().clear();
         String channelId = opage.getUri().getPath().substring(1);
         String uri = "https://www.googleapis.com/youtube/v3/playlists?part=snippet&maxResults=30&channelId=" + channelId;
         String json = HttpUtils.get(uri, youtubeParser.createHeaders(), CHARSET);
