@@ -101,19 +101,31 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
     private void parseSubscriptions(IWebPage page) throws Exception {
         IOverviewPage opage = (IOverviewPage) page;
-        String uri = "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=alphabetical";
-        String json = HttpUtils.get(uri, createHeaders(), CHARSET);
-        JSONObject response = new JSONObject(json);
-        JSONArray items = response.getJSONArray("items");
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject sub = items.getJSONObject(i);
-            JSONObject snippet = sub.getJSONObject("snippet");
-            IOverviewPage channelPage = new OverviewPage();
-            channelPage.setParser(getId());
-            channelPage.setTitle(snippet.getString("title"));
-            channelPage.setUri(new URI("yt://channel/" + snippet.getJSONObject("resourceId").getString("channelId")));
-            opage.getPages().add(channelPage);
-        }
+        int maxresults = 50;
+        int fetched = 0;
+        int total = 0;
+        String baseUri = "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults="+maxresults+"&order=alphabetical";
+        String uri = baseUri;
+        do {
+            String json = HttpUtils.get(uri, createHeaders(), CHARSET);
+            JSONObject response = new JSONObject(json);
+            JSONObject pageInfo = response.getJSONObject("pageInfo");
+            total = pageInfo.getInt("totalResults");
+            if(response.has("nextPageToken") && !response.isNull("nextPageToken")) {
+                uri = baseUri + "&pageToken=" + response.getString("nextPageToken");
+            }
+            JSONArray items = response.getJSONArray("items");
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject sub = items.getJSONObject(i);
+                JSONObject snippet = sub.getJSONObject("snippet");
+                IOverviewPage channelPage = new OverviewPage();
+                channelPage.setParser(getId());
+                channelPage.setTitle(snippet.getString("title"));
+                channelPage.setUri(new URI("yt://channel/" + snippet.getJSONObject("resourceId").getString("channelId")));
+                opage.getPages().add(channelPage);
+            }
+            fetched += maxresults;
+        } while(fetched < total);
     }
 
     Map<String, String> createHeaders() {
@@ -132,7 +144,7 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
     /**
      * Checks, if the access token is about to expire
-     * 
+     *
      * @return true, if the access token expires in less than 1 minute
      */
     private boolean tokenNeedsRefresh() {
@@ -143,7 +155,7 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
 
     /**
      * Uses the user's refresh token to obtain a new access token, which then is valid for about an hour
-     * 
+     *
      * @throws UnsupportedEncodingException
      * @throws IOException
      * @throws JSONException
@@ -155,9 +167,9 @@ public class YoutubeParser implements IWebParser, ResourceBundleProvider {
         }
 
         // @formatter:off
-        String params = "client_id=" + CLIENT_ID + "&" + 
-                "client_secret=" + CLIENT_SECRET + "&" + 
-                "refresh_token=" + refreshToken + "&" + 
+        String params = "client_id=" + CLIENT_ID + "&" +
+                "client_secret=" + CLIENT_SECRET + "&" +
+                "refresh_token=" + refreshToken + "&" +
                 "grant_type=refresh_token";
         // @formatter:on
 
